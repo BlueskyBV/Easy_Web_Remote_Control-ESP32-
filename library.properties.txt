@@ -1,0 +1,9 @@
+name=EasyWebRemoteControl
+version=1.0.0
+author=Colojoara Alexandru (BlueskyBV)
+maintainer=Colojoara Alexandru (blueskybv) <alexcolojoara007@gmail.com>
+sentence=A library to easily control ESP32 systems and devices over the web.
+paragraph=Easy_Web_Remote_Control lets you send and receive commands from a browser or other network-enabled clients, making it easy to build web-based remote control projects.
+category=Communication
+url=https://github.com/yourusername/EasyWebRemoteControl
+architectures=esp32
