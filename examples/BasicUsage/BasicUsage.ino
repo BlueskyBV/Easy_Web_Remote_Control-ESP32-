@@ -16,6 +16,8 @@ void forward() {
   digitalWrite(IN2, LOW);
   digitalWrite(IN3, HIGH);
   digitalWrite(IN4, LOW);
+  Serial.println("forward");
+  delay(100);
 }
 
 void backward() {
@@ -23,20 +25,26 @@ void backward() {
   digitalWrite(IN2, HIGH);
   digitalWrite(IN3, LOW);
   digitalWrite(IN4, HIGH);
+  Serial.println("backward");
+  delay(100);
 }
 
 void left() {
   digitalWrite(IN1, LOW);
-  digitalWrite(IN2, HIGH);  // Left motor backward
+  digitalWrite(IN2, HIGH);
   digitalWrite(IN3, HIGH);
-  digitalWrite(IN4, LOW);   // Right motor forward
+  digitalWrite(IN4, LOW);
+  Serial.println("left");
+  delay(100);
 }
 
 void right() {
   digitalWrite(IN1, HIGH);
-  digitalWrite(IN2, LOW);   // Left motor forward
+  digitalWrite(IN2, LOW);
   digitalWrite(IN3, LOW);
-  digitalWrite(IN4, HIGH);  // Right motor backward
+  digitalWrite(IN4, HIGH);
+  Serial.println("right");
+  delay(100);
 }
 
 void stopCar() {
@@ -44,6 +52,8 @@ void stopCar() {
   digitalWrite(IN2, LOW);
   digitalWrite(IN3, LOW);
   digitalWrite(IN4, LOW);
+  Serial.println("stop");
+  delay(100);
 }
 
 void setup() {
@@ -57,14 +67,33 @@ void setup() {
 
   stopCar(); // Make sure motors are off at boot
 
-  controller.begin("RC_Car", "12345678"); // Start WiFi + Web control. Full freedom over WiFi name and password
+//   controller.setAPConfig(
+//     IPAddress(10,10,10,1),    // AP IP (ESP32)
+//     IPAddress(10,10,10,1),    // Gateway (same as AP IP)
+//     IPAddress(255,255,255,0)  // Subnet
+// ); --> Use this method to change and customize the address you need to connect to in your browser in AP mode to access the ESP32
+// Clients connect to the AP SSID and then browse to http://10.10.10.1/
+
+  // controller.setSTAStatic(
+  //   IPAddress(192,168,0,125), // Device IP (pick one NOT already used)
+  //   IPAddress(192,168,0,1),   // Your router
+  //   IPAddress(255,255,255,0), // Subnet
+  //   IPAddress(192,168,0,1),  // DNS1
+  //   IPAddress(1, 1, 1, 1)    // DNS2 (optional)
+  // ); --> Use this method to change the address you need to connect to in STA mode to access the ESP32 based on your device's IP, wifi's IP, DNS1 and DNS2 (OPTIONAL! Only if you have a DNS2. If no, skip it)
+
+  // controller.setHostname("EasyRemote"); --> Use this method to change the host name of your ESP32 when it connects to your wifi in the wifi list
+
+  controller.beginAP("RC_Car", "12345678"); //Use this method to begin the AP mode of the ESP32 and initialize the /ws server. Full freedom over WiFi name and password
+  //controller.beginSTA("TP-Link_77D0", "14638152"); --> Use this method to begin the STA mode of the ESP32 and initialise the /ws server. Put as parameters the name and password of the wifi you want the ESP32 to connect to. You can also put a 3rd parameter which will be the number of miliseconds you want the trial of connectivity to expire if it can't connect to your wifi router. The default is 10000 ms. Skip this parameter if you want as it is only optional
+  // controller.beginDual("RC_Car", "12345678", "TP-Link_77D0", "14638152") --> Use this method to begin the Dual mode of the ESP32 and initialise the /ws server. Input the AP and STA names and passwords. AP parameters first and STA parameters second. The connectivity expiration parameter is still in this method too and it is also optional so skip it if you don't want to change it
 
   // Attach commands
-  controller.onForward(forward); // Attach the "forward()" method you previously created to the up arrow button"
-  controller.onBackward(backward); // Attach the "backward()" method you previously created to the down arrow button"
-  controller.onLeft(left); // Attach the "left()" method you previously created to the left arrow button"
-  controller.onRight(right); // Attach the "right()" method you previously created to the right arrow button"
-  controller.onStop(stopCar); // Attach the "stop()" method you previously created to the middle button. VERY IMPORTANT! YOUR CUSTOM METHOD YOU ATTACH USING onStop() SHOULD BE THE METHOD YOU WANT TO CALL TO STOP ALL MECHANISMS THAT YOU ARE CONTROLLING AS IT IS CALLED AUTOMATICALLY AT THE END OF ALL OTHER INPUTS TO AT LEAST THEORETICALLY STOP THE MECHANISMS NATURALLY"
+  controller.onFront(forward); // Attach the "forward()" method you previously created to the up arrow button
+  controller.onBack(backward); // Attach the "backward()" method you previously created to the down arrow button
+  controller.onLeft(left); // Attach the "left()" method you previously created to the left arrow button
+  controller.onRight(right); // Attach the "right()" method you previously created to the right arrow button
+  controller.onStop(stopCar); // Attach the "stop()" method you previously created to the middle button. VERY IMPORTANT! YOUR CUSTOM METHOD YOU ATTACH USING onStop() SHOULD BE THE METHOD YOU WANT TO CALL TO STOP ALL MECHANISMS THAT YOU ARE CONTROLLING AS IT IS CALLED AUTOMATICALLY AT THE END OF ALL OTHER INPUTS TO AT LEAST THEORETICALLY STOP THE MECHANISMS NATURALLY
 
   // Other set-up methods the library features (should be called in setup)
   //Button function configuration
@@ -75,10 +104,9 @@ void setup() {
 
   //Slider control
   //THE SLIDER CAN BE USED IN CODE TO ESTABILISH THE PWM OUTPUT OF YOUR SYSTEM! RANGES BETWEEN 0 AND 225
-  //The "Speed" in the method names for the slider doesn't necesarily reffer to the speed or something. Just the PWM output of your system. Depending on your system, it could mean the speed of a motor, brightness of an LED or just the power delivered to something else. I chose a simpler name for the methods so it's easier and more straightforward for beginners
   controller.showSlider(true); //Method to show/hide the PWM slider in the web interface. The default is already true. Can be turned of using this method and setting it to false
-  controller.setInitialSpeed(25); // Method to set beforehand the initial PWM output on the web interface slider
-  controller.getSpeed(); // Returns the int value of the slider representing your PWM output. If coded right, can be used as the actual PWM output of your system
+  controller.setInitialPWM(25); // Method to set beforehand the initial PWM output on the web interface slider
+  controller.getPWM(); // Returns the int value of the slider representing your PWM output. If coded right, can be used as the actual PWM output of your system
 }
 
 void loop() {

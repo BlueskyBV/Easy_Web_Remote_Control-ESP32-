@@ -89,18 +89,27 @@ void loop() {
 
 Initialization
 EasyWebRemoteControl remote;
-remote.begin(ssid, password);
+remote.beginAP(ssid, password);
+remote.beginSTA(const char* ssid, const char* password, uint32_t connectTimeoutMs = 10000);
+remote.beginDual(const char* apSsid, const char* apPassword,
+               const char* staSsid, const char* staPassword,
+               uint32_t connectTimeoutMs = 10000);
+remote.setAPNetwork(IPAddress ip, IPAddress gateway, IPAddress subnet);
+remote.setSTAStatic(IPAddress ip, IPAddress gateway, IPAddress subnet,
+                  IPAddress dns1, IPAddress dns2 = IPAddress(0,0,0,0));
+remote.setHostname(const char* name);
+
 
 Callbacks
-remote.onForward(func);
-remote.onBackward(func);
+remote.onFront(func);
+remote.onBack(func);
 remote.onLeft(func);
 remote.onRight(func);
 remote.onStop(func);
 
 Slider
-int speed = remote.getSpeed();
-remote.setInitialSpeed(128);
+int PWM = remote.getPWM();
+remote.setInitialPWM(128);
 remote.showSlider(true);
 
 Configuration
