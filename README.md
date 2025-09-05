@@ -3,29 +3,31 @@ Easy_Web_Remote_Control
 Control devices via a web interface with ESP32.
 A library to easily create a web-based remote control interface on ESP32 using WebSockets. Supports directional buttons, speed slider, and configurable actions.
 
-Table of Contents
+Table of Contents:
 
-Features
+-Features
 
-Requirements
+-Requirements
 
-Installation
+-Installation
 
-Usage
+-Usage
 
-API Reference
+-API Reference
 
-Examples
+-Examples
 
-License
+-License
 
-Features
+
+
+-Features:
 
 Web-based control of devices over Wi-Fi
 
 Directional buttons: Forward, Backward, Left, Right, Stop
 
-Optional speed slider (0–255)
+Optional PWM output slider (0–255)
 
 Configurable action timers, taps, hold, and delay
 
@@ -33,30 +35,31 @@ Fully asynchronous using WebSockets
 
 Works with ESP32 boards
 
-Requirements
+
+
+-Requirements:
 
 You need the following libraries installed in your Arduino IDE:
 
 Library	Minimum Tested Version	Notes
-ESPAsyncWebServer by me-no-dev
-	1.2.3	Required for the web server
-AsyncTCP by me-no-dev
-	1.1.1	Required by ESPAsyncWebServer
+ESP Async WebServer by ESP32Async
+	1.2.3+	Required for the web server (latest version is recommended)
+AsyncTCP by ESP32Async
+	1.1.1+	Required (latest version is recommended)
 WiFi	Comes with the ESP32 Arduino core	No need to install separately
 
-⚠️ Do not blindly update these libraries if you want the examples to work exactly. Stick to tested versions to avoid breaking changes.
 
-Installation
-Arduino IDE Manual Installation
 
-Download the latest release from GitHub
-.
+-Installation
+Arduino IDE Installation
 
-Copy the EasyWebRemoteControl folder into your Arduino libraries directory.
+Download the latest release either from the Arduino Library Manager or GitHub (if from GitHub, add the library in the  Arduino IDE manually)
 
 Restart the Arduino IDE.
 
-Usage
+
+
+-Usage
 Basic Setup
 #include <EasyWebRemoteControl.h>
 
@@ -80,7 +83,10 @@ void loop() {
     remote.update();
 }
 
-API Reference
+
+
+-API Reference:
+
 Initialization
 EasyWebRemoteControl remote;
 remote.begin(ssid, password);
@@ -103,20 +109,29 @@ remote.setTaps("left", 2);
 remote.setHold("right", 500); // ms
 remote.setDelay("backward", 200); // ms
 
-Examples
 
-The library comes with a Basic_Usage example. Copy the folder to your Arduino examples directory or open it directly from the IDE:
 
-Basic_Usage: Demonstrates buttons, slider, and callbacks.
+-Examples
 
-License
+The library comes with a BasicUsage example. Copy the folder to your Arduino examples directory or open it directly from the IDE:
+
+BasicUsage: Demonstrates buttons, slider, and callbacks.
+
+
+
+
+-License
 
 MIT License. See LICENSE for details.
+
+
 
 Notes for Users
 
 Tested on ESP32 boards only.
 
-Use recommended library versions to avoid breaking changes.
+Use recommended libraries.
 
 Web interface runs at http://192.168.4.1/ by default in AP mode.
+
+Use, change and customize the library based on your project's needs!

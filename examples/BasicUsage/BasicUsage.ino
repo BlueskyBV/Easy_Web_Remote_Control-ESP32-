@@ -76,7 +76,7 @@ void setup() {
   //Slider control
   //THE SLIDER CAN BE USED IN CODE TO ESTABILISH THE PWM OUTPUT OF YOUR SYSTEM! RANGES BETWEEN 0 AND 225
   //The "Speed" in the method names for the slider doesn't necesarily reffer to the speed or something. Just the PWM output of your system. Depending on your system, it could mean the speed of a motor, brightness of an LED or just the power delivered to something else. I chose a simpler name for the methods so it's easier and more straightforward for beginners
-  controller.showwSlider(true); //Method to show/hide the PWM slider in the web interface. The default is already true. Can be turned of using this method and setting it to false
+  controller.showSlider(true); //Method to show/hide the PWM slider in the web interface. The default is already true. Can be turned of using this method and setting it to false
   controller.setInitialSpeed(25); // Method to set beforehand the initial PWM output on the web interface slider
   controller.getSpeed(); // Returns the int value of the slider representing your PWM output. If coded right, can be used as the actual PWM output of your system
 }
