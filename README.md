@@ -1,5 +1,5 @@
 Easy_Web_Remote_Control by Colojoara Alexandru also known as BlueskyBV
-Version 3.0.1
+Version 4.0.0
 
 Control ESP32 systems via a web interface with the Easy_Web_Remote_Control library!
 A C++ library suited for Arduino IDE to easily create a web-based remote control interface on ESP32 using WebSockets. Supports directional buttons, PWM output slider, connection auto-recovery, universal video capabilities using fast snapshots and configurable actions.
