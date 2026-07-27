@@ -186,21 +186,14 @@ void EasyWebRemoteControl::addHttpRoutes() {
 
         // rotate the WebSocket token on each page load if requested.
         if (instance->authEnabled && instance->rotateTokenPerLoad && !instance->wsTokenSet) {
-            // Fiecare incarcare de pagina primeste un token nou, dar sesiunile
-            // deja autentificate NU sunt invalidate: ele si-au dovedit deja
-            // identitatea, iar golirea listei le-ar lasa intr-o stare in care
-            // clientul se crede autentificat, insa serverul ii ignora tacit
-            // comenzile (mai multe file deschise sau o simpla reincarcare).
-            // Sesiunile vechi expira oricum prin setSessionTimeout().
+            
             instance->wsToken = instance->genToken();
         }
 
         // Build a response so we can attach security headers.
         AsyncWebServerResponse* resp =
             request->beginResponse(200, "text/html", instance->buildHtmlPage());
-        // Pagina este generata dinamic si se schimba la fiecare reflash sau
-        // rotatie de token. Fara acest antet, browserul poate servi din cache
-        // o versiune veche a interfetei dupa actualizarea firmware-ului.
+
         resp->addHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
         instance->addSecurityHeaders(resp);
         request->send(resp);
@@ -816,9 +809,7 @@ bool EasyWebRemoteControl::httpAuthOK(AsyncWebServerRequest* req) {
     // Failed: record attempt and possibly lock out.
     fireSecurityEvent(SEC_AUTH_FAIL, "http login fail");
     if (maxAuthAttempts > 0) {
-        // Marginim dimensiunea hartii: fara aceasta limita, cereri de la multe
-        // adrese diferite ar creste la nesfarsit consumul de memorie. 64 de
-        // adrese urmarite acopera larg orice retea locala realista.
+        
         if (authFailMap.size() >= 64 && authFailMap.find(ipKey) == authFailMap.end()) {
             authFailMap.clear();
         }
