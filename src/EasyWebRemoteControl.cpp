@@ -148,7 +148,7 @@ void EasyWebRemoteControl::beginDual(const char* apSsid, const char* apPassword,
     printUrlsIfChanged(true);
 }
 
-// -------- server wiring (v5: generates WS token if auth is on) --------
+// -------- server wiring (generates WS token if auth is on) --------
 void EasyWebRemoteControl::startServer() {
     // Generate a WebSocket auth token if authentication is enabled and the
     // user did not provide one explicitly.
@@ -156,7 +156,7 @@ void EasyWebRemoteControl::startServer() {
         wsToken = genToken();
     }
 
-    // v6: generate a random salt for PBKDF2 key derivation (encryption).
+    // generate a random salt for PBKDF2 key derivation (encryption).
     if (encryptionEnabled && pbkdfSalt.length() == 0) {
         pbkdfSalt = genToken();  // 32 hex chars = 16 bytes of salt
     }
@@ -184,15 +184,24 @@ void EasyWebRemoteControl::addHttpRoutes() {
         if (!instance->ipFilterOK(request)) return;   // 403 if IP not permitted
         if (!instance->httpAuthOK(request)) return;    // sends 401/403 as needed
 
-        // v6: rotate the WebSocket token on each page load if requested.
+        // rotate the WebSocket token on each page load if requested.
         if (instance->authEnabled && instance->rotateTokenPerLoad && !instance->wsTokenSet) {
+            // Fiecare incarcare de pagina primeste un token nou, dar sesiunile
+            // deja autentificate NU sunt invalidate: ele si-au dovedit deja
+            // identitatea, iar golirea listei le-ar lasa intr-o stare in care
+            // clientul se crede autentificat, insa serverul ii ignora tacit
+            // comenzile (mai multe file deschise sau o simpla reincarcare).
+            // Sesiunile vechi expira oricum prin setSessionTimeout().
             instance->wsToken = instance->genToken();
-            instance->authedClients.clear();  // old sessions must re-authenticate
         }
 
         // Build a response so we can attach security headers.
         AsyncWebServerResponse* resp =
             request->beginResponse(200, "text/html", instance->buildHtmlPage());
+        // Pagina este generata dinamic si se schimba la fiecare reflash sau
+        // rotatie de token. Fara acest antet, browserul poate servi din cache
+        // o versiune veche a interfetei dupa actualizarea firmware-ului.
+        resp->addHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
         instance->addSecurityHeaders(resp);
         request->send(resp);
         });
@@ -220,7 +229,7 @@ void EasyWebRemoteControl::addHttpRoutes() {
         });
 }
 
-// -------- update (UNCHANGED) --------
+// -------- update --------
 void EasyWebRemoteControl::update() {
     ws.cleanupClients();
     serviceWatchdog();
@@ -236,7 +245,7 @@ void EasyWebRemoteControl::update() {
     }
 }
 
-// -------- URL printing helpers (UNCHANGED) --------
+// -------- URL printing helpers  --------
 void EasyWebRemoteControl::printUrlsIfChanged(bool forceOnce) {
     IPAddress ap = WiFi.softAPIP();
     IPAddress st = WiFi.localIP();
@@ -269,7 +278,7 @@ void EasyWebRemoteControl::printAddrLine(const char* label, const IPAddress& ip)
     Serial.println("/");
 }
 
-// -------- Auto-recovery internals (UNCHANGED) --------
+// -------- Auto-recovery internals  --------
 void EasyWebRemoteControl::initWatchdogIfNeeded() {
 #ifdef ESP32
     if (wdtInited) return;
@@ -349,7 +358,7 @@ void EasyWebRemoteControl::checkAndRecoverWiFi() {
     }
 }
 
-// -------- public API: callbacks (classic — UNCHANGED) --------
+// -------- public API: callbacks  --------
 void EasyWebRemoteControl::onFront(void (*func)()) { frontCallback = func; }
 void EasyWebRemoteControl::onBack(void (*func)()) { backCallback = func; }
 void EasyWebRemoteControl::onLeft(void (*func)()) { leftCallback = func; }
@@ -357,7 +366,7 @@ void EasyWebRemoteControl::onRight(void (*func)()) { rightCallback = func; }
 void EasyWebRemoteControl::onStop(void (*func)()) { stopCallback = func; }
 
 // ====================================================================
-// ============  NEW IN v4: generic command callbacks  ================
+// ============  generic command callbacks  ================
 // ====================================================================
 void EasyWebRemoteControl::onCommand(const char* command, void (*func)()) {
     if (!command) return;
@@ -367,7 +376,7 @@ void EasyWebRemoteControl::onAnyCommand(void (*func)(const String&)) {
     anyCommandCallback = func;
 }
 
-// -------- PWM API (UNCHANGED + new slider config) --------
+// -------- PWM API  --------
 int  EasyWebRemoteControl::getPWM() { return currentPWM; }
 void EasyWebRemoteControl::setInitialPWM(int val) {
     if (val < sliderMin) val = sliderMin;
@@ -384,13 +393,13 @@ void EasyWebRemoteControl::setSliderRange(int minVal, int maxVal) {
 void EasyWebRemoteControl::setSliderLabel(const char* label) { if (label) sliderLabel = label; }
 void EasyWebRemoteControl::setSliderWidth(int px) { if (px > 0) sliderWidth = px; }
 
-// -------- video controls (UNCHANGED) --------
+// -------- video controls  --------
 void EasyWebRemoteControl::enableVideo(bool enable) { videoEnabled = enable; }
 void EasyWebRemoteControl::setSnapshotFPS(uint8_t fps) { snapshotFPS = fps; }
 void EasyWebRemoteControl::pauseSnapshots(bool paused) { videoPaused = paused; }
 void EasyWebRemoteControl::setVideoFrameProvider(VideoProvider p) { frameProvider = p; }
 
-// -------- per-button behavior (UNCHANGED) --------
+// -------- per-button behavior  --------
 void EasyWebRemoteControl::addActionTimer(const char* buttonId, int durationMs) {
     if (durationMs < -1) return;
     actionTimers[String(buttonId)] = durationMs;
@@ -409,7 +418,7 @@ void EasyWebRemoteControl::setDelay(const char* buttonId, int delayMs) {
 }
 
 // ====================================================================
-// ============  NEW IN v4: UI model management  =====================
+// ============  UI model management  =====================
 // ====================================================================
 EasyWebRemoteControl::UIButton* EasyWebRemoteControl::findButton(const char* id) {
     if (!id) return nullptr;
@@ -516,7 +525,7 @@ void EasyWebRemoteControl::setHeaderHTML(const char* html) { if (html) headerHTM
 void EasyWebRemoteControl::setFooterHTML(const char* html) { if (html) footerHTML = html; }
 
 // ====================================================================
-// ============  NEW IN v4: escaping helpers  ========================
+// ============ escaping helpers  ========================
 // ====================================================================
 // Escapes a string so it is safe to embed inside a double-quoted JS string.
 String EasyWebRemoteControl::jsEscape(const String& s) {
@@ -577,11 +586,11 @@ void EasyWebRemoteControl::ensureDefaultButtons() {
     defaultsInjected = true;
 }
 
-// -------- command handling (EXTENDED — classic dispatch preserved) --------
+// -------- command handling  --------
 void EasyWebRemoteControl::handleCommand(String cmd) {
     cmd.trim();
     if (cmd.length() == 0) return;
-    // v5 hardening: reject oversized commands (anti-DoS / anti buffer abuse).
+    // reject oversized commands (anti-DoS / anti buffer abuse).
     if (cmd.length() > maxCommandLength) return;
 
     if (cmd.startsWith("pwm:")) {
@@ -599,22 +608,22 @@ void EasyWebRemoteControl::handleCommand(String cmd) {
     else if (cmd == "right" && rightCallback) { rightCallback(); return; }
     else if (cmd == "stop" && stopCallback) { stopCallback();  return; }
 
-    // (2) NEW: per-command custom handlers registered via onCommand().
+    // (2) per-command custom handlers registered via onCommand().
     auto it = commandCallbacks.find(cmd);
     if (it != commandCallbacks.end() && it->second) {
         it->second();
         return;
     }
 
-    // (3) NEW: catch-all handler registered via onAnyCommand().
+    // (3)  catch-all handler registered via onAnyCommand().
     if (anyCommandCallback) {
         anyCommandCallback(cmd);
         return;
     }
-    // Unknown command with no handler: silently ignored (same as before).
+    // Unknown command with no handler: silently ignored.
 }
 
-// -------- websocket (v5: token auth + rate limiting) --------
+// -------- websocket (token auth + rate limiting) --------
 void EasyWebRemoteControl::onWsEvent(AsyncWebSocket* server, AsyncWebSocketClient* client,
     AwsEventType type, void* arg, uint8_t* data, size_t len) {
     (void)server; (void)arg; // required by AsyncWebSocket signature, not used here
@@ -631,7 +640,9 @@ void EasyWebRemoteControl::onWsEvent(AsyncWebSocket* server, AsyncWebSocketClien
     }
 
     if (type == WS_EVT_CONNECT) {
-        // New client starts unauthenticated when auth is enabled.
+ 
+        instance->authedClients.erase(cid);
+        instance->lastSeenMs.erase(cid);
         instance->rateMap.erase(cid);
         return;
     }
@@ -642,6 +653,10 @@ void EasyWebRemoteControl::onWsEvent(AsyncWebSocket* server, AsyncWebSocketClien
         for (size_t i = 0; i < len; ++i) msg += (char)data[i];
         msg.trim();
 
+
+        const size_t rawLimit = (size_t)instance->maxCommandLength * 4 + 64;
+        if (msg.length() > rawLimit) return;
+
         const uint32_t now = millis();
 
         // ---- Authentication gate ----
@@ -650,23 +665,27 @@ void EasyWebRemoteControl::onWsEvent(AsyncWebSocket* server, AsyncWebSocketClien
                 // Only accept an "auth:<token>" message until authenticated.
                 if (msg.startsWith("auth:")) {
                     String tok = msg.substring(5);
-                    // v6: constant-time comparison (anti timing-attack).
+                    //constant-time comparison (anti timing-attack).
                     if (instance->wsToken.length() && instance->secureEquals(tok, instance->wsToken)) {
                         instance->authedClients.insert(cid);
                         instance->lastSeenMs[cid] = now;
-                        instance->fireSecurityEvent(SEC_LOGIN_OK, "ws token ok");
+                        instance->fireSecurityEvent(SEC_LOGIN_OK, String("ws token ok (client #") + String(cid) + ")");
                         if (client) client->text("auth:ok");
                     }
                     else {
-                        instance->fireSecurityEvent(SEC_BAD_TOKEN, "ws token bad");
+                        instance->fireSecurityEvent(SEC_BAD_TOKEN, String("ws token bad (client #") + String(cid) + ")");
                         if (client) client->text("auth:fail");
                         if (client) client->close();
                     }
                 }
+                else {
+
+                    if (client) client->text("auth:required");
+                }
                 return;
             }
 
-            // v6: session expiry — invalidate idle sessions.
+            // session expiry — invalidate idle sessions.
             if (instance->sessionTimeoutMs > 0) {
                 uint32_t last = instance->lastSeenMs.count(cid) ? instance->lastSeenMs[cid] : now;
                 if (now - last > instance->sessionTimeoutMs) {
@@ -685,24 +704,31 @@ void EasyWebRemoteControl::onWsEvent(AsyncWebSocket* server, AsyncWebSocketClien
             return;
         }
 
-        // ---- v6: decryption of encrypted commands ----
-        // Encrypted commands arrive as "enc:<base64>". When encryption is on,
+        // ---- decryption of encrypted commands ----
+        // Encrypted commands arrive as "enc:<base64>". In strict mode (default)
         // plaintext control commands are rejected so nothing leaks in the clear.
+        // With setEncryptionFallback(true), plaintext is accepted as a documented
+        // degradation for browsers without a secure context (the page shows a
+        // visible warning in that case).
         if (instance->encryptionEnabled) {
             if (msg.startsWith("enc:")) {
                 String plain = instance->tryDecryptCommand(msg.substring(4));
                 if (plain.length() == 0) return;   // decryption failed (event already fired)
                 instance->handleCommand(plain);
+                return;
             }
-            // Non-encrypted, non-auth traffic is ignored when encryption is on.
-            return;
+            if (!instance->encryptionFallback) {
+                // Strict: never accept plaintext while encryption is on.
+                return;
+            }
+            // Fallback: fall through and accept the plaintext command.
         }
 
         instance->handleCommand(msg);
     }
 }
 // ====================================================================
-// ============  NEW IN v5: security implementation  =================
+// ============  security implementation  =================
 // ====================================================================
 
 // ---- public configuration ----
@@ -790,6 +816,12 @@ bool EasyWebRemoteControl::httpAuthOK(AsyncWebServerRequest* req) {
     // Failed: record attempt and possibly lock out.
     fireSecurityEvent(SEC_AUTH_FAIL, "http login fail");
     if (maxAuthAttempts > 0) {
+        // Marginim dimensiunea hartii: fara aceasta limita, cereri de la multe
+        // adrese diferite ar creste la nesfarsit consumul de memorie. 64 de
+        // adrese urmarite acopera larg orice retea locala realista.
+        if (authFailMap.size() >= 64 && authFailMap.find(ipKey) == authFailMap.end()) {
+            authFailMap.clear();
+        }
         AuthFailInfo& info = authFailMap[ipKey];
         info.failures++;
         if (info.failures >= maxAuthAttempts) {
@@ -821,7 +853,7 @@ bool EasyWebRemoteControl::rateLimited(uint32_t clientId) {
 }
 
 // ====================================================================
-// ============  NEW IN v6: hardening + encryption impl  =============
+// ============  hardening + encryption impl  =============
 // ====================================================================
 
 // ---- public configuration ----
@@ -847,6 +879,9 @@ void EasyWebRemoteControl::setEncryptionKey(const char* passphrase) {
     if (!passphrase) return;
     encryptionPass = passphrase;
     encryptionEnabled = true;
+}
+void EasyWebRemoteControl::setEncryptionFallback(bool allowPlaintext) {
+    encryptionFallback = allowPlaintext;
 }
 void EasyWebRemoteControl::clearEncryptionKey() {
     encryptionEnabled = false; encryptionPass = "";
@@ -941,10 +976,25 @@ String EasyWebRemoteControl::tryDecryptCommand(const String& encB64) {
     unsigned char key[32];
     const mbedtls_md_info_t* mdinfo = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
     if (!mdinfo) { free(raw); return String(""); }
+#if defined(MBEDTLS_VERSION_NUMBER) && (MBEDTLS_VERSION_NUMBER >= 0x03000000)
+    // mbedTLS 3.x (ESP-IDF v5+)
     rc = mbedtls_pkcs5_pbkdf2_hmac_ext(MBEDTLS_MD_SHA256,
         (const unsigned char*)encryptionPass.c_str(), encryptionPass.length(),
         (const unsigned char*)pbkdfSalt.c_str(), pbkdfSalt.length(),
         100000, sizeof(key), key);
+#else
+    // mbedTLS 2.x (ESP-IDF v4)
+    mbedtls_md_context_t md_ctx;
+    mbedtls_md_init(&md_ctx);
+    rc = mbedtls_md_setup(&md_ctx, mdinfo, 1);   // 1 = HMAC
+    if (rc == 0) {
+        rc = mbedtls_pkcs5_pbkdf2_hmac(&md_ctx,
+            (const unsigned char*)encryptionPass.c_str(), encryptionPass.length(),
+            (const unsigned char*)pbkdfSalt.c_str(), pbkdfSalt.length(),
+            100000, sizeof(key), key);
+    }
+    mbedtls_md_free(&md_ctx);
+#endif
     if (rc != 0) { free(raw); fireSecurityEvent(SEC_DECRYPT_FAIL, "pbkdf2"); return String(""); }
 
     // 3) AES-256-GCM authenticated decryption.
@@ -972,7 +1022,7 @@ String EasyWebRemoteControl::tryDecryptCommand(const String& encB64) {
 }
 
 // ====================================================================
-// ============  NEW IN v4: data-driven page builder  ================
+// ============  data-driven page builder  ================
 // ====================================================================
 // This rewrite generates the UI from the uiButtons vector instead of
 // hardcoded HTML. If the user never configured anything, ensureDefaultButtons()
@@ -1097,7 +1147,7 @@ String EasyWebRemoteControl::buildHtmlPage() {
     if (videoEnabled) {
         videoUI =
             "<div class=\"row\" id=\"videoRow\">"
-            "<img id=\"snapImg\" alt=\"camera\" style=\"max-width:320px;max-height:240px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.2)\"/>"
+            "<img id=\"snapImg\" alt=\"\" style=\"max-width:320px;max-height:240px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.2)\"/>"
             "</div>";
     }
 
@@ -1127,23 +1177,25 @@ String EasyWebRemoteControl::buildHtmlPage() {
         "const VIDEO_ENABLED=" + String(videoEnabled ? "true" : "false") + ";"
         "const VIDEO_PAUSED=" + String(videoPaused ? "true" : "false") + ";"
         "const SNAP_FPS=" + String(snapshotFPS) + ";"
-        // v5: WS auth token — injected ONLY when auth is enabled. Because the
+        // WS auth token — injected ONLY when auth is enabled. Because the
         // page itself is served behind HTTP auth, only authenticated users ever
         // receive this token.
         "const WS_AUTH=" + String(authEnabled ? "true" : "false") + ";"
         "const WS_TOKEN=\"" + (authEnabled ? jsEscape(wsToken) : String("")) + "\";"
-        // v6: encryption constants. WS_ENCRYPT enables AES-256-GCM of commands.
+        //  encryption constants. WS_ENCRYPT enables AES-256-GCM of commands.
         // The salt is public (PBKDF2 salt); the passphrase is NEVER sent — the
         // user types it into the browser, so plaintext and key never hit the wire.
         "const WS_ENCRYPT=" + String(encryptionEnabled ? "true" : "false") + ";"
         "const ENC_SALT=\"" + (encryptionEnabled ? jsEscape(pbkdfSalt) : String("")) + "\";"
+        "const ENC_FALLBACK=" + String(encryptionFallback ? "true" : "false") + ";"
         R"JS(
 // Use current origin (works in AP, STA, and Dual), auto-select ws/wss
 const gateway = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
 let ws;
 let wsAuthed = false;
+let wsGaveUp = false;   // token respins definitiv: nu mai reconectam
 
-// ---- v6: encryption (AES-256-GCM via Web Crypto) ----
+// ----  encryption (AES-256-GCM via Web Crypto) ----
 // crypto.subtle exists ONLY in a secure context (HTTPS, localhost, tunnel).
 // Over plain http://IP it is undefined, so we detect that and refuse to send,
 // telling the user to use TLS/localhost. This is a browser rule, not a bug.
@@ -1151,7 +1203,8 @@ let encKey = null;
 const cryptoOK = (typeof crypto !== 'undefined' && crypto.subtle);
 async function deriveKey(passphrase, saltHex){
   const enc = new TextEncoder();
-  const salt = Uint8Array.from(saltHex.match(/.{1,2}/g).map(h=>parseInt(h,16)));
+
+  const salt = enc.encode(saltHex);
   const baseKey = await crypto.subtle.importKey('raw', enc.encode(passphrase),
                     {name:'PBKDF2'}, false, ['deriveKey']);
   return crypto.subtle.deriveKey(
@@ -1168,15 +1221,51 @@ async function encryptCmd(plain){
   out.set(iv, 0); out.set(ct, iv.length);   // [IV][ciphertext+tag]
   return 'enc:' + b64(out);
 }
+// Afiseaza vizibil starea canalului. Utilizatorul stie mereu daca
+// comenzile sunt criptate sau nu — transparenta, nu presupuneri.
+let plainMode = false;
+function secBadge(text, bg, fg){
+  let b = document.getElementById('secBadge');
+  if(!b){
+    b = document.createElement('div');
+    b.id = 'secBadge';
+    b.style.cssText = 'margin:10px auto 0;padding:6px 16px;border-radius:20px;'
+      + 'display:inline-block;font-size:13px;font-weight:700;letter-spacing:.5px;';
+    document.body.insertBefore(b, document.body.firstChild);
+  }
+  b.textContent = text;
+  b.style.background = bg;
+  b.style.color = fg;
+}
+
 async function initEncryption(){
-  if(!WS_ENCRYPT) return;
+  if(!WS_ENCRYPT){ console.log('[EWRC] Criptare dezactivata in sketch.'); return; }
+  console.log('[EWRC] WS_ENCRYPT=' + WS_ENCRYPT + '  FALLBACK=' + ENC_FALLBACK
+            + '  crypto.subtle=' + (typeof crypto !== 'undefined' ? typeof crypto.subtle : 'no crypto')
+            + '  secureContext=' + (typeof isSecureContext !== 'undefined' ? isSecureContext : '?'));
   if(!cryptoOK){
-    alert('Criptarea necesita un context securizat (HTTPS sau localhost). '
-        + 'Peste http://IP simplu, browserul dezactiveaza Web Crypto.');
+
+    if(ENC_FALLBACK){
+      plainMode = true;
+      secBadge('CANAL NECRIPTAT - context nesecurizat', '#7a2c2c', '#ffdcdc');
+      console.log('Web Crypto indisponibil: comenzi in clar (fallback activat).');
+    } else {
+      secBadge('BLOCAT - criptarea necesita HTTPS/localhost', '#7a2c2c', '#ffdcdc');
+      alert('Criptarea necesita un context securizat (HTTPS sau localhost). '
+          + 'Peste http://IP simplu, browserul dezactiveaza Web Crypto.');
+    }
     return;
   }
   const pass = prompt('Introduceti fraza de criptare:');
-  if(pass){ encKey = await deriveKey(pass, ENC_SALT); }
+  if(pass){
+    encKey = await deriveKey(pass, ENC_SALT);
+    secBadge('CANAL CRIPTAT AES-256-GCM', '#14532d', '#c9f7d5');
+  } else if(ENC_FALLBACK){
+    plainMode = true;
+    secBadge('CANAL NECRIPTAT - fara fraza', '#7a2c2c', '#ffdcdc');
+  } else {
+    secBadge('BLOCAT - fara fraza de criptare', '#7a2c2c', '#ffdcdc');
+  }
 }
 
 function connectWS(){
@@ -1187,10 +1276,24 @@ function connectWS(){
   };
   ws.onmessage = (ev)=>{
     if (ev.data === 'auth:ok')      wsAuthed = true;
-    if (ev.data === 'auth:fail')    { wsAuthed = false; console.log('auth failed'); }
-    if (ev.data === 'auth:expired') { wsAuthed = false; console.log('session expired'); }
+
+    if (ev.data === 'auth:required'){
+      wsAuthed = false;
+      if (WS_AUTH && !wsGaveUp) ws.send('auth:' + WS_TOKEN);
+    }
+
+    if (ev.data === 'auth:fail' || ev.data === 'auth:expired'){
+      wsAuthed = false;
+      wsGaveUp = true;
+      secBadge('SESIUNE INVALIDA - reincarca pagina (F5)', '#7a2c2c', '#ffdcdc');
+      console.log('[EWRC] Token respins sau sesiune expirata. Reincarca pagina.');
+    }
   };
-  ws.onclose = ()=>{ wsAuthed = false; setTimeout(connectWS,1000); };
+  ws.onclose = ()=>{
+    wsAuthed = false;
+    if (wsGaveUp) return;            // nu mai insistam cu un token invalid
+    setTimeout(connectWS,1000);
+  };
   ws.onerror = (e)=>console.log('ws err', e);
 }
 initEncryption();
@@ -1198,11 +1301,15 @@ connectWS();
 async function sendCommand(cmd){
   if(!(ws && ws.readyState===WebSocket.OPEN && (wsAuthed || !WS_AUTH))) return;
   if(WS_ENCRYPT){
-    if(!encKey) return;                 // no key => refuse to send in the clear
-    try { ws.send(await encryptCmd(cmd)); } catch(e){ console.log('enc err', e); }
-  } else {
-    ws.send(cmd);
+    if(encKey){
+      // Avem cheie: criptam intotdeauna.
+      try { ws.send(await encryptCmd(cmd)); } catch(e){ console.log('enc err', e); }
+      return;
+    }
+    // Fara cheie: trimitem in clar DOAR daca fallback-ul e activat explicit.
+    if(!plainMode) return;   // strict: refuzam sa trimitem necriptat
   }
+  ws.send(cmd);
 }
 
 // Resolve the command string for a button id (falls back to the id itself).
@@ -1331,6 +1438,10 @@ if(slider){
   if(!img) return;
   if(VIDEO_PAUSED || !SNAP_FPS || SNAP_FPS===0) return;
   const period = Math.max(200, Math.floor(1000/Math.min(SNAP_FPS, 30)));
+  // Cand nu exista inca un cadru, serverul raspunde 204 No Content, iar
+  // browserul ar afisa pictograma de imagine stricata. Stergem sursa la eroare,
+  // asa incat caseta ramane curata pana la primul cadru valid.
+  img.onerror = function(){ img.removeAttribute('src'); };
   function tick(){
     img.src = '/snapshot?t=' + Date.now();
   }

@@ -20,7 +20,7 @@ public:
     using VideoProvider = bool (*)(VideoFrame& out); // return true if a frame is provided
 
     // ====================================================================
-    // ============  NEW IN v4: fully customizable UI model  ==============
+    // ============   fully customizable UI model  ==============
     // ====================================================================
     // A single button described entirely by data. Every visual attribute
     // has a default that reproduces the classic look, so an unconfigured
@@ -45,7 +45,7 @@ public:
 
     EasyWebRemoteControl();
 
-    // ---- Network bring-up (no plain begin() anymore) ----
+    // ---- Network bring-up  ----
     void beginAP(const char* ssid, const char* password);
     void beginSTA(const char* ssid, const char* password, uint32_t connectTimeoutMs = 10000);
     void beginDual(const char* apSsid, const char* apPassword,
@@ -71,7 +71,7 @@ public:
     void onStop(void (*func)());
 
     // ====================================================================
-    // ============  NEW IN v4: generic command callbacks  ================
+    // ============  generic command callbacks  ================
     // ====================================================================
     // Register a handler for ANY command string (including custom buttons).
     // Works alongside the classic onFront/onBack/... handlers.
@@ -81,7 +81,7 @@ public:
     void onAnyCommand(void (*func)(const String& cmd));
 
     // ====================================================================
-    // ============  NEW IN v4: full UI customization API  ================
+    // ============ full UI customization API  ================
     // ====================================================================
     // --- Adding / managing buttons ---
     // Add a fully custom button. Returns nothing; chain setters by id afterwards.
@@ -147,23 +147,18 @@ public:
         uint32_t reconnectPeriodMs = 5000);
 
     // ====================================================================
-    // ============  NEW IN v5: security / protection layer  =============
+    // ============  security / protection layer  =============
     // ====================================================================
     // All security features default to OFF, so existing sketches are
     // unaffected. Enabling authentication turns on the full chain:
     // HTTP auth on every route + WebSocket token auth + rate limiting.
-    //
-    // IMPORTANT (honest security model): Basic/Digest auth and the WS token
-    // protect against unauthorized ACCESS, but over plain HTTP/WS they do
-    // NOT encrypt traffic. On a WPA2-protected Wi-Fi this is adequate. For
-    // Internet exposure, enable TLS (see setTLSCertificate) which requires
-    // an ESP32 with PSRAM and a TLS-capable server build.
 
     // Enable HTTP authentication (protects "/", "/snapshot", and issues the
     // WebSocket token only to authenticated clients).
     void setAuthCredentials(const char* username, const char* password);
     void clearAuthCredentials();
-    void setUseDigestAuth(bool useDigest);        // true=Digest (default), false=Basic
+
+    void setUseDigestAuth(bool useDigest);        // implicit true (Digest)
     void setAuthRealm(const char* realm);         // text shown in the browser login dialog
     void requireAuthForSnapshot(bool require);    // also protect the video endpoint (default true)
 
@@ -188,7 +183,7 @@ public:
     void setTLSCertificate(const char* certPem, const char* keyPem);
 
     // ====================================================================
-    // ============  NEW IN v6: hardening + real encryption  =============
+    // ============ hardening + real encryption  =============
     // ====================================================================
 
     // ---- Session management ----
@@ -232,6 +227,15 @@ public:
     // limitation: real confidentiality in a browser ultimately requires TLS or
     // a localhost/tunnel context. The passphrase itself is never transmitted.
     void setEncryptionKey(const char* passphrase);
+    // Graceful degradation for encryption (default OFF = strict).
+    // When the browser has no secure context, crypto.subtle is unavailable and
+    // the page cannot encrypt. Strict mode (default) refuses to send anything —
+    // never silently falling back to plaintext. With fallback enabled, the page
+    // sends plaintext BUT displays a clearly visible warning badge, and the
+    // device accepts both encrypted and plaintext commands. Use this only when
+    // usability over plain HTTP matters more than guaranteed confidentiality
+    // (for example a live demonstration on a local Access Point).
+    void setEncryptionFallback(bool allowPlaintext);
     void clearEncryptionKey();
 
 private:
@@ -247,14 +251,14 @@ private:
     void (*rightCallback)() = nullptr;
     void (*stopCallback)() = nullptr;
 
-    // NEW IN v4: generic command dispatch
+    // generic command dispatch
     std::map<String, void(*)()> commandCallbacks;     // command -> handler
     void (*anyCommandCallback)(const String&) = nullptr;
 
     // PWM state
     int  currentPWM;
     bool sliderEnabled;
-    // NEW IN v4: slider config
+    // slider config
     int    sliderMin = 0;
     int    sliderMax = 255;
     String sliderLabel = "";
@@ -272,7 +276,7 @@ private:
     uint8_t       snapshotFPS = 5;
     VideoProvider frameProvider = nullptr;
 
-    // NEW IN v4: UI model
+    // UI model
     std::vector<UIButton> uiButtons;       // empty => defaults injected lazily
     bool   defaultsInjected = false;
     // global styling
@@ -290,7 +294,7 @@ private:
     String headerHTML = "";
     String footerHTML = "";
 
-    // NEW IN v5: security state
+    // security state
     bool     authEnabled = false;
     String   authUser = "";
     String   authPass = "";
@@ -320,7 +324,7 @@ private:
     bool   wsClientAuthed(uint32_t clientId);
     bool   rateLimited(uint32_t clientId);
 
-    // NEW IN v6: hardening + encryption state
+    // hardening + encryption state
     uint32_t sessionTimeoutMs = 0;       // 0 = sessions never expire
     bool     rotateTokenPerLoad = false;
     bool     securityHeaders = false;   // auto-enabled with auth
@@ -328,13 +332,14 @@ private:
     std::set<uint32_t>  blockedIPs;
     void (*securityEventCb)(SecurityEvent, const String&) = nullptr;
     bool     encryptionEnabled = false;
+    bool     encryptionFallback = false;   // allow plaintext when browser can't encrypt
     String   encryptionPass = "";      // passphrase (used to derive AES key)
     String   pbkdfSalt = "";      // random salt generated at startup
 
     // per-client last-activity timestamp for session expiry
     std::map<uint32_t, uint32_t> lastSeenMs;
 
-    // v6 helpers
+    //  helpers
     bool   secureEquals(const String& a, const String& b);   // constant-time compare
     bool   ipFilterOK(AsyncWebServerRequest* req);
     bool   ipAllowed(uint32_t ipKey);
@@ -362,7 +367,7 @@ private:
         AwsEventType type, void* arg, uint8_t* data, size_t len);
     String buildHtmlPage();
 
-    // NEW IN v4: UI helpers
+    //  UI helpers
     void   ensureDefaultButtons();         // inject classic 5-button layout if empty
     UIButton* findButton(const char* id);  // locate a button by id (nullptr if absent)
     String jsEscape(const String& s);      // escape a string for safe JS embedding
