@@ -14,7 +14,7 @@
 EasyWebRemoteControl* EasyWebRemoteControl::instance = nullptr;
 
 // -------- ctor --------
-EasyWebRemoteControl::EasyWebRemoteControl()
+EasyWebRemoteControl::EasyWebRemoteControl() //Constructor. Builds the server on port 80 and the WebSocket on /ws through the initializer list (mandatory — neither has a default constructor). Stores this in the static pointer, the bridge through which static handlers reach the object's state. Touches no hardware: it runs before setup().
     : server(80), ws("/ws"),
     currentPWM(0), sliderEnabled(true),
     lastApIPPrinted((uint32_t)0), lastStaIPPrinted((uint32_t)0)
@@ -23,24 +23,28 @@ EasyWebRemoteControl::EasyWebRemoteControl()
 }
 
 // -------- optional configuration (call BEFORE begin...) --------
-void EasyWebRemoteControl::setAPConfig(IPAddress ip, IPAddress gateway, IPAddress subnet) {
+void EasyWebRemoteControl::setAPConfig(IPAddress ip, IPAddress gateway, IPAddress subnet) //Sets a fixed IP, gateway and subnet for Access Point mode. Must be called before beginAP.
+{
     apStaticSet = true; apIP = ip; apGW = gateway; apSN = subnet;
 }
-void EasyWebRemoteControl::clearAPConfig() { apStaticSet = false; }
+void EasyWebRemoteControl::clearAPConfig() { apStaticSet = false; } //Reverts to the default Access Point address.
 
 void EasyWebRemoteControl::setSTAStatic(IPAddress ip, IPAddress gateway, IPAddress subnet,
-    IPAddress dns1, IPAddress dns2) {
+    IPAddress dns1, IPAddress dns2) //Sets a static IP for Station mode, including DNS servers. Called before beginSTA.
+{
     staStaticSet = true; staIP = ip; staGW = gateway; staSN = subnet; staDNS1 = dns1; staDNS2 = dns2;
 }
-void EasyWebRemoteControl::clearSTAStatic() { staStaticSet = false; }
+void EasyWebRemoteControl::clearSTAStatic() { staStaticSet = false; } //Reverts to automatic address assignment via DHCP.
 
-void EasyWebRemoteControl::setHostName(const char* host) {
+void EasyWebRemoteControl::setHostName(const char* host) //Sets the hostname visible on the network (Station mode only). Empty string disables it.
+{
     if (host) hostName = host;
     else      hostName = "";
 }
 
 // ---- Auto-recovery configuration (public) ----
-void EasyWebRemoteControl::enableAutoRecovery(bool enable) {
+void EasyWebRemoteControl::enableAutoRecovery(bool enable) //Turns automatic reconnection on or off.
+{
     autoRecoveryEnabled = enable;
 }
 
@@ -48,7 +52,8 @@ void EasyWebRemoteControl::setAutoRecoveryTimings(int32_t reconnectWindowMs,
     int32_t rebootAfterMs,
     uint32_t checkIntervalMs,
     uint32_t reconnectAfterMs,
-    uint32_t reconnectPeriodMs) {
+    uint32_t reconnectPeriodMs) //Configures the five timings of the reconnection state machine: retry window, reboot threshold, check interval, initial grace delay, and spacing between attempts.
+{
     ar_reconnectWindowMs = reconnectWindowMs;
     ar_rebootAfterMs = rebootAfterMs;
     ar_checkIntervalMs = checkIntervalMs;
@@ -57,7 +62,8 @@ void EasyWebRemoteControl::setAutoRecoveryTimings(int32_t reconnectWindowMs,
 }
 
 // -------- bring-up: AP / STA / Dual (UNCHANGED) --------
-void EasyWebRemoteControl::beginAP(const char* ssid, const char* password) {
+void EasyWebRemoteControl::beginAP(const char* ssid, const char* password) //Starts the board in Access Point mode: it creates its own network, no router needed. Applies the static IP if configured, then starts the server, the watchdog, and prints the addresses.
+{
     WiFi.mode(WIFI_AP);
     if (apStaticSet) {
         if (!WiFi.softAPConfig(apIP, apGW, apSN)) {
@@ -72,7 +78,8 @@ void EasyWebRemoteControl::beginAP(const char* ssid, const char* password) {
     printUrlsIfChanged(true);
 }
 
-void EasyWebRemoteControl::beginSTA(const char* ssid, const char* password, uint32_t connectTimeoutMs) {
+void EasyWebRemoteControl::beginSTA(const char* ssid, const char* password, uint32_t connectTimeoutMs) //Connects the board to an existing network. Waits for the connection until the timeout expires, then starts the server regardless of the outcome so the device stays diagnosable. The only blocking section in the library, and it runs once, inside setup.
+{
     WiFi.mode(WIFI_STA);
     WiFi.setAutoReconnect(autoRecoveryEnabled);
     if (hostName.length()) {
@@ -107,7 +114,8 @@ void EasyWebRemoteControl::beginSTA(const char* ssid, const char* password, uint
 
 void EasyWebRemoteControl::beginDual(const char* apSsid, const char* apPassword,
     const char* staSsid, const char* staPassword,
-    uint32_t connectTimeoutMs) {
+    uint32_t connectTimeoutMs) //Starts both modes at once: joins an existing network while also offering its own fallback network. If the connection fails, the Access Point stays active.
+{
     WiFi.mode(WIFI_AP_STA);
     WiFi.setAutoReconnect(autoRecoveryEnabled);
     if (apStaticSet) {
@@ -149,7 +157,8 @@ void EasyWebRemoteControl::beginDual(const char* apSsid, const char* apPassword,
 }
 
 // -------- server wiring (generates WS token if auth is on) --------
-void EasyWebRemoteControl::startServer() {
+void EasyWebRemoteControl::startServer() //Prepares and starts the server. Generates the WebSocket token if authentication is on, generates the key-derivation salt if encryption is on, warns about unavailable TLS, then registers the handlers and routes.
+{
     // Generate a WebSocket auth token if authentication is enabled and the
     // user did not provide one explicitly.
     if (authEnabled && !wsTokenSet) {
@@ -178,7 +187,8 @@ void EasyWebRemoteControl::startServer() {
     if (encryptionEnabled) Serial.println("[SEC] Command encryption ENABLED (AES-256-GCM).");
 }
 
-void EasyWebRemoteControl::addHttpRoutes() {
+void EasyWebRemoteControl::addHttpRoutes() //Registers the two HTTP routes. The "/" route checks the IP filter, then authentication, rotates the token, and serves the page with security headers attached. The "/snapshot" route requests a frame from the provider and transmits it without copying, releasing it after the send.
+{
     server.on("/", HTTP_GET, [](AsyncWebServerRequest* request) {
         if (!instance) { request->send(500, "text/plain", "No instance"); return; }
         if (!instance->ipFilterOK(request)) return;   // 403 if IP not permitted
@@ -223,7 +233,8 @@ void EasyWebRemoteControl::addHttpRoutes() {
 }
 
 // -------- update --------
-void EasyWebRemoteControl::update() {
+void EasyWebRemoteControl::update() //Periodic maintenance, called from the main loop: clears dead WebSocket clients, feeds the watchdog, checks the Wi-Fi state, and prints the address if it changed.
+{
     ws.cleanupClients();
     serviceWatchdog();
     checkAndRecoverWiFi();
@@ -239,7 +250,8 @@ void EasyWebRemoteControl::update() {
 }
 
 // -------- URL printing helpers  --------
-void EasyWebRemoteControl::printUrlsIfChanged(bool forceOnce) {
+void EasyWebRemoteControl::printUrlsIfChanged(bool forceOnce) //Prints the access addresses only when the IP has changed, to avoid flooding the console. The parameter forces a single print at startup.
+{
     IPAddress ap = WiFi.softAPIP();
     IPAddress st = WiFi.localIP();
     bool apValid = (ap[0] != 0 || ap[1] != 0 || ap[2] != 0 || ap[3] != 0);
@@ -263,7 +275,8 @@ void EasyWebRemoteControl::printUrlsIfChanged(bool forceOnce) {
     }
 }
 
-void EasyWebRemoteControl::printAddrLine(const char* label, const IPAddress& ip) {
+void EasyWebRemoteControl::printAddrLine(const char* label, const IPAddress& ip) //Formats and prints one address line. Skips null addresses.
+{
     if (ip[0] == 0 && ip[1] == 0 && ip[2] == 0 && ip[3] == 0) return;
     Serial.print(label);
     Serial.print(": http://");
@@ -272,7 +285,8 @@ void EasyWebRemoteControl::printAddrLine(const char* label, const IPAddress& ip)
 }
 
 // -------- Auto-recovery internals  --------
-void EasyWebRemoteControl::initWatchdogIfNeeded() {
+void EasyWebRemoteControl::initWatchdogIfNeeded() //Starts the software watchdog. First tries to subscribe the current task to an already-running watchdog; if none exists, initializes one with an 8-second threshold. Conditional compilation covers ESP-IDF v4 and v5, whose APIs differ.
+{
 #ifdef ESP32
     if (wdtInited) return;
     esp_err_t err;
@@ -305,13 +319,15 @@ void EasyWebRemoteControl::initWatchdogIfNeeded() {
 #endif
 }
 
-void EasyWebRemoteControl::serviceWatchdog() {
+void EasyWebRemoteControl::serviceWatchdog() //Feeds the watchdog. If it is not called for 8 seconds, the board reboots automatically.
+{
 #ifdef ESP32
     if (wdtInited) esp_task_wdt_reset();
 #endif
 }
 
-void EasyWebRemoteControl::checkAndRecoverWiFi() {
+void EasyWebRemoteControl::checkAndRecoverWiFi() //The four-state reconnection state machine. Checks the connection at intervals, records the moment it was lost, attempts reconnection after the grace period, and reboots the board if the disconnection exceeds the configured threshold.
+{
     const unsigned long now = millis();
     if (now - lastWifiCheckMs < ar_checkIntervalMs) return;
     lastWifiCheckMs = now;
@@ -352,20 +368,22 @@ void EasyWebRemoteControl::checkAndRecoverWiFi() {
 }
 
 // -------- public API: callbacks  --------
-void EasyWebRemoteControl::onFront(void (*func)()) { frontCallback = func; }
-void EasyWebRemoteControl::onBack(void (*func)()) { backCallback = func; }
-void EasyWebRemoteControl::onLeft(void (*func)()) { leftCallback = func; }
-void EasyWebRemoteControl::onRight(void (*func)()) { rightCallback = func; }
-void EasyWebRemoteControl::onStop(void (*func)()) { stopCallback = func; }
+void EasyWebRemoteControl::onFront(void (*func)()) { frontCallback = func; } //Registers the function called for the matching command. Only stores the pointer; the call happens later, when the command arrives.
+void EasyWebRemoteControl::onBack(void (*func)()) { backCallback = func; } //Registers the function called for the matching command. Only stores the pointer; the call happens later, when the command arrives.
+void EasyWebRemoteControl::onLeft(void (*func)()) { leftCallback = func; } //Registers the function called for the matching command. Only stores the pointer; the call happens later, when the command arrives.
+void EasyWebRemoteControl::onRight(void (*func)()) { rightCallback = func; } //Registers the function called for the matching command. Only stores the pointer; the call happens later, when the command arrives.
+void EasyWebRemoteControl::onStop(void (*func)()) { stopCallback = func; } //Registers the function called for the matching command. Only stores the pointer; the call happens later, when the command arrives.
 
 // ====================================================================
 // ============  generic command callbacks  ================
 // ====================================================================
-void EasyWebRemoteControl::onCommand(const char* command, void (*func)()) {
+void EasyWebRemoteControl::onCommand(const char* command, void (*func)()) //Registers a handler for a custom command, identified by name.
+{
     if (!command) return;
     commandCallbacks[String(command)] = func;
 }
-void EasyWebRemoteControl::onAnyCommand(void (*func)(const String&)) {
+void EasyWebRemoteControl::onAnyCommand(void (*func)(const String&)) //Registers the catch-all handler, called for any command without a dedicated one.
+{
     anyCommandCallback = func;
 }
 
@@ -390,7 +408,7 @@ void EasyWebRemoteControl::setSliderWidth(int px) { if (px > 0) sliderWidth = px
 void EasyWebRemoteControl::enableVideo(bool enable) { videoEnabled = enable; }
 void EasyWebRemoteControl::setSnapshotFPS(uint8_t fps) { snapshotFPS = fps; }
 void EasyWebRemoteControl::pauseSnapshots(bool paused) { videoPaused = paused; }
-void EasyWebRemoteControl::setVideoFrameProvider(VideoProvider p) { frameProvider = p; }
+void EasyWebRemoteControl::setVideoFrameProvider(VideoProvider p) { frameProvider = p; } //Registers the function the library requests frames from. Without it, the video endpoint reports no content.
 
 // -------- per-button behavior  --------
 void EasyWebRemoteControl::addActionTimer(const char* buttonId, int durationMs) {
@@ -413,7 +431,8 @@ void EasyWebRemoteControl::setDelay(const char* buttonId, int delayMs) {
 // ====================================================================
 // ============  UI model management  =====================
 // ====================================================================
-EasyWebRemoteControl::UIButton* EasyWebRemoteControl::findButton(const char* id) {
+EasyWebRemoteControl::UIButton* EasyWebRemoteControl::findButton(const char* id) //Looks up a button by identifier and returns its address, or null if absent. Used by every styling method.
+{
     if (!id) return nullptr;
     String target(id);
     for (auto& b : uiButtons) {
@@ -422,7 +441,8 @@ EasyWebRemoteControl::UIButton* EasyWebRemoteControl::findButton(const char* id)
     return nullptr;
 }
 
-void EasyWebRemoteControl::addButton(const char* id, const char* label, const char* command, int row) {
+void EasyWebRemoteControl::addButton(const char* id, const char* label, const char* command, int row) //Adds a new button, or updates it if the identifier already exists. The default command equals the identifier. Automatically detects the stop button by id or command so it receives the handler that cancels every timer. Marks that the user has taken control, so the default buttons are no longer injected.
+{
     if (!id) return;
     // If a button with this id already exists, update it instead of duplicating.
     UIButton* existing = findButton(id);
@@ -445,12 +465,14 @@ void EasyWebRemoteControl::addButton(const char* id, const char* label, const ch
     defaultsInjected = true; // user is taking control; do not inject defaults later
 }
 
-void EasyWebRemoteControl::clearButtons() {
+void EasyWebRemoteControl::clearButtons() //Removes all buttons. An explicitly empty interface is a user choice, so the defaults are not re-injected.
+{
     uiButtons.clear();
     defaultsInjected = true; // explicit empty UI is a user choice
 }
 
-void EasyWebRemoteControl::removeButton(const char* id) {
+void EasyWebRemoteControl::removeButton(const char* id) //Removes a single button by identifier.
+{
     if (!id) return;
     String target(id);
     for (size_t i = 0; i < uiButtons.size(); ++i) {
@@ -521,7 +543,8 @@ void EasyWebRemoteControl::setFooterHTML(const char* html) { if (html) footerHTM
 // ============ escaping helpers  ========================
 // ====================================================================
 // Escapes a string so it is safe to embed inside a double-quoted JS string.
-String EasyWebRemoteControl::jsEscape(const String& s) {
+String EasyWebRemoteControl::jsEscape(const String& s) //Converts dangerous characters into a form that is safe inside a JavaScript context. Also converts the less-than and greater-than signs, so user text cannot close the script tag prematurely.
+{
     String out;
     out.reserve(s.length() + 8);
     for (size_t i = 0; i < s.length(); ++i) {
@@ -541,7 +564,8 @@ String EasyWebRemoteControl::jsEscape(const String& s) {
 }
 
 // Escapes a string so it is safe to embed inside HTML text/attributes.
-String EasyWebRemoteControl::htmlEscape(const String& s) {
+String EasyWebRemoteControl::htmlEscape(const String& s) //Converts special characters into HTML entities. Applied to labels and attributes, it prevents code injection through user-supplied text.
+{
     String out;
     out.reserve(s.length() + 8);
     for (size_t i = 0; i < s.length(); ++i) {
@@ -561,7 +585,8 @@ String EasyWebRemoteControl::htmlEscape(const String& s) {
 // Injects the classic 5-button layout if the user never added any button.
 // This guarantees byte-for-byte identical behavior to the legacy version
 // for anyone who does not touch the new UI API.
-void EasyWebRemoteControl::ensureDefaultButtons() {
+void EasyWebRemoteControl::ensureDefaultButtons() //Injects the classic five-button layout when the user has added none. This is the backward-compatibility guarantee: anyone who does not touch the new API gets exactly the old interface.
+{
     if (defaultsInjected || !uiButtons.empty()) return;
 
     UIButton front; front.id = "front"; front.label = "\xE2\x86\x91"; front.command = "front"; front.row = 0;
@@ -580,7 +605,8 @@ void EasyWebRemoteControl::ensureDefaultButtons() {
 }
 
 // -------- command handling  --------
-void EasyWebRemoteControl::handleCommand(String cmd) {
+void EasyWebRemoteControl::handleCommand(String cmd) //Normalizes the command, rejects empty or oversized messages, handles the slider command separately with range clamping, then dispatches on three levels: the classic commands with highest priority, custom handlers, and finally the catch-all handler. An unknown command with no handler is silently ignored.
+{
     cmd.trim();
     if (cmd.length() == 0) return;
     // reject oversized commands (anti-DoS / anti buffer abuse).
@@ -618,7 +644,8 @@ void EasyWebRemoteControl::handleCommand(String cmd) {
 
 // -------- websocket (token auth + rate limiting) --------
 void EasyWebRemoteControl::onWsEvent(AsyncWebSocket* server, AsyncWebSocketClient* client,
-    AwsEventType type, void* arg, uint8_t* data, size_t len) {
+    AwsEventType type, void* arg, uint8_t* data, size_t len) //The gate every command passes through. On disconnect and on connect it clears all state tied to that client, so a new client cannot inherit an old one's authentication. Limits the raw message size, then checks in order: token authentication with constant-time comparison, session expiry, rate limiting, and decryption. An unauthenticated client receives an explicit re-authentication request instead of having its message dropped without explanation.
+{
     (void)server; (void)arg; // required by AsyncWebSocket signature, not used here
     if (!instance) return;
 
@@ -752,7 +779,8 @@ void EasyWebRemoteControl::setTLSCertificate(const char* certPem, const char* ke
 }
 
 // ---- token generation (cryptographically-seeded on ESP32) ----
-String EasyWebRemoteControl::genToken() {
+String EasyWebRemoteControl::genToken() //Generates a 128-bit token using the board's hardware random number generator. Each byte becomes two hexadecimal characters. Unlike the ordinary pseudo-random generator, the seed is not predictable.
+{
     // 32 hex chars = 128 bits of entropy from the hardware RNG.
     const char* hex = "0123456789abcdef";
     String t;
@@ -770,7 +798,8 @@ String EasyWebRemoteControl::genToken() {
 }
 
 // ---- HTTP auth check with brute-force lockout ----
-bool EasyWebRemoteControl::httpAuthOK(AsyncWebServerRequest* req) {
+bool EasyWebRemoteControl::httpAuthOK(AsyncWebServerRequest* req) //Verifies authentication for an HTTP request. Packs the client address into an integer for efficient tracking, applies the lockout before comparing the password, resets the counter on a successful login, and on failure increments it and locks out once the threshold is reached. Bounds the failure map so it cannot grow indefinitely.
+{
     if (!authEnabled) return true;
 
     // Identify the client IP for brute-force tracking.
@@ -826,12 +855,14 @@ bool EasyWebRemoteControl::httpAuthOK(AsyncWebServerRequest* req) {
     return false;
 }
 
-bool EasyWebRemoteControl::wsClientAuthed(uint32_t clientId) {
+bool EasyWebRemoteControl::wsClientAuthed(uint32_t clientId) //Checks whether a WebSocket connection has passed token authentication.
+{
     return authedClients.find(clientId) != authedClients.end();
 }
 
 // ---- per-client rate limiting (sliding 1-second window) ----
-bool EasyWebRemoteControl::rateLimited(uint32_t clientId) {
+bool EasyWebRemoteControl::rateLimited(uint32_t clientId) //Rate limiting with a one-second sliding window, counted separately for each client, so an abusive client does not affect the others.
+{
     if (rateLimitPerSec == 0) return false; // disabled
     const uint32_t now = millis();
     RateInfo& r = rateMap[clientId];
